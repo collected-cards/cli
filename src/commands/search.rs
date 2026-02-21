@@ -17,11 +17,11 @@ pub async fn search(api: &ApiClient, query: &str, tcg: Option<&str>, limit: Opti
                     id name setCode setName collectorNumber rarity imageUrl currentPrice
                 } 
             }",
-            Some(json!({
-                "q": query,
-                "tcg": tcg,
-                "limit": limit
-            })),
+            Some({
+                let mut vars = json!({"q": query, "limit": limit});
+                if let Some(t) = tcg { vars["tcg"] = json!(t); }
+                vars
+            }),
         )
         .await?;
 
