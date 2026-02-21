@@ -10,20 +10,27 @@ use crate::display;
 pub async fn search(api: &ApiClient, query: &str, tcg: Option<&str>, limit: Option<i32>) -> Result<()> {
     let limit = limit.unwrap_or(20);
     
-    let data = api
-        .query(
-            "query($tcg: String, $q: String!, $limit: Int) { 
+    let (gql, vars) = if let Some(t) = tcg {
+        (
+            "query($tcg: String!, $q: String!, $limit: Int) { 
                 searchCards(tcg: $tcg, query: $q, limit: $limit) { 
                     id name setCode setName collectorNumber rarity imageUrl currentPrice
                 } 
             }",
-            Some({
-                let mut vars = json!({"q": query, "limit": limit});
-                if let Some(t) = tcg { vars["tcg"] = json!(t); }
-                vars
-            }),
+            json!({"q": query, "tcg": t, "limit": limit}),
         )
-        .await?;
+    } else {
+        (
+            "query($q: String!, $limit: Int) { 
+                searchCards(tcg: \"\", query: $q, limit: $limit) { 
+                    id name setCode setName collectorNumber rarity imageUrl currentPrice
+                } 
+            }",
+            json!({"q": query, "limit": limit}),
+        )
+    };
+
+    let data = api.query(gql, Some(vars)).await?;
 
     let cards: Vec<CardResult> =
         serde_json::from_value(data["searchCards"].clone()).unwrap_or_default();
