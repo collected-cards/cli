@@ -1,0 +1,37 @@
+[package]
+name = "collected"
+version = "0.1.0"
+edition = "2021"
+description = "CLI for collected.cards — manage your TCG collection from the terminal"
+license = "LicenseRef-collected"
+repository = "https://github.com/collected-cards/cli"
+homepage = "https://collected.cards"
+readme = "README.md"
+keywords = ["tcg", "magic", "pokemon", "yugioh", "collection"]
+categories = ["command-line-utilities"]
+
+[[bin]]
+name = "collected"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+toml = "0.8"
+dirs = "6"
+colored = "2"
+comfy-table = "7"
+indicatif = "0.17"
+dialoguer = "0.11"
+anyhow = "1"
+image = "0.24"
+viuer = "0.7"
+
+[profile.release]
+strip = true
+lto = true
+opt-level = "z"
+codegen-units = 1
