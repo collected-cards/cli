@@ -87,18 +87,15 @@ impl ApiClient {
     }
 }
 
-/// Sanitize API error messages — strip internal details (SQL, stack traces, paths)
+/// Return a clean, user-facing error message.
 fn sanitize_error(msg: &str) -> String {
-    // Strip common internal prefixes
     let msg = msg.trim();
-    // Don't leak SQL errors, file paths, or stack traces
-    if msg.contains("SELECT ") || msg.contains("INSERT ") || msg.contains("DELETE ")
-        || msg.contains("/opt/") || msg.contains("panicked at")
-        || msg.contains("sqlx::") || msg.contains("tokio::")
-    {
+    let dominated_by_internals = ["SELECT ", "INSERT ", "DELETE ", "UPDATE ",
+        "/opt/", "/app/", "panicked at", "sqlx::", "tokio::", "thread '"]
+        .iter().any(|p| msg.contains(p));
+    if dominated_by_internals {
         return crate::i18n::t("common.api_error").to_string();
     }
-    // Truncate overly long messages
     if msg.len() > 200 {
         return format!("{}…", &msg[..200]);
     }
