@@ -5,6 +5,7 @@ use serde::Deserialize;
 
 use crate::api::ApiClient;
 use crate::display;
+use crate::i18n::t;
 
 // ─── Types ───────────────────────────────────────────
 
@@ -96,28 +97,29 @@ pub async fn status(api: &ApiClient) -> Result<()> {
 
     println!();
 
-    // Access status
     if let Some(access) = data.get("myTradeAccess").and_then(|v| {
         serde_json::from_value::<TradeAccess>(v.clone()).ok()
     }) {
         if access.is_active {
             println!(
-                "  {} Trade-Zugang aktiv — {} Tage verbleibend ({}km Radius)",
+                "  {} {} — {} {} ({}{})",
                 "✅".to_string(),
+                t("trade.access_active"),
                 access.days_remaining.to_string().green(),
-                access.radius_km
+                t("trade.active_days"),
+                access.radius_km,
+                t("trade.km_radius")
             );
         } else {
-            println!("  {} Trade-Zugang abgelaufen", "❌".to_string());
+            println!("  {} {}", "❌".to_string(), t("trade.access_expired"));
         }
     } else {
-        println!("  {} Kein Trade-Zugang", "❌".to_string());
-        println!("  Aktiviere ihn auf https://collected.cards/trades");
+        println!("  {} {}", "❌".to_string(), t("trade.no_access"));
+        println!("  {} https://collected.cards/trades", t("trade.activate_hint"));
         println!();
         return Ok(());
     }
 
-    // Profile
     if let Some(profile) = data.get("myTradeProfile").and_then(|v| {
         serde_json::from_value::<TradeProfile>(v.clone()).ok()
     }) {
@@ -133,30 +135,33 @@ pub async fn status(api: &ApiClient) -> Result<()> {
             }
         }
         println!(
-            "  📦 {} Angebote  |  🔍 {} Gesuche",
+            "  📦 {} {}  |  🔍 {} {}",
             profile.offer_count.to_string().green(),
-            profile.want_count.to_string().cyan()
+            t("trade.offers_count"),
+            profile.want_count.to_string().cyan(),
+            t("trade.wants_count")
         );
     }
 
-    // Stats
     if let Some(stats) = data.get("tradeStats").and_then(|v| {
         serde_json::from_value::<TradeStats>(v.clone()).ok()
     }) {
         println!();
         println!("  {}", "━".repeat(40).dimmed());
         println!(
-            "  🤝 {} aktive Trader  |  🃏 {} Karten im Handel",
-            stats.active_traders, stats.total_trade_cards
+            "  🤝 {} {}  |  🃏 {} {}",
+            stats.active_traders, t("trade.active_traders"),
+            stats.total_trade_cards, t("trade.cards_in_trade")
         );
         if stats.my_offers > 0 || stats.my_wants > 0 {
             println!(
-                "  📊 {} Matches gefunden  |  {} deiner Karten gesucht",
+                "  📊 {} {}  |  {} {}",
                 stats.matched_wants.to_string().green(),
-                stats.wanted_offers.to_string().cyan()
+                t("trade.matches_found"),
+                stats.wanted_offers.to_string().cyan(),
+                t("trade.your_cards_wanted")
             );
 
-            // Trade chance bar
             let chance = stats.trade_chance.min(100).max(0);
             let filled = chance / 5;
             let empty = 20 - filled;
@@ -172,7 +177,7 @@ pub async fn status(api: &ApiClient) -> Result<()> {
             } else {
                 bar.red()
             };
-            println!("  🎯 Trade-Chance: {} {}%", color_bar, chance);
+            println!("  🎯 {}: {} {}%", t("trade.trade_chance"), color_bar, chance);
         }
     }
 
@@ -180,7 +185,7 @@ pub async fn status(api: &ApiClient) -> Result<()> {
     Ok(())
 }
 
-// ─── Offers (Angebote) ──────────────────────────────
+// ─── Offers ──────────────────────────────────────────
 
 pub async fn offers(api: &ApiClient) -> Result<()> {
     let data = api
@@ -195,20 +200,20 @@ pub async fn offers(api: &ApiClient) -> Result<()> {
 
     if offers.is_empty() {
         println!();
-        println!("  Keine Trade-Angebote vorhanden.");
-        println!("  Markiere Karten als tauschbar auf https://collected.cards/collection");
+        println!("  {}", t("trade.no_offers"));
+        println!("  {} https://collected.cards/collection", t("trade.mark_hint"));
         println!();
         return Ok(());
     }
 
     println!();
-    println!("  📦 {} Angebote", offers.len().to_string().green());
+    println!("  📦 {} {}", offers.len().to_string().green(), t("trade.offers_count"));
     println!();
 
     let mut table = Table::new();
     table.load_preset(UTF8_BORDERS_ONLY);
     table.set_content_arrangement(ContentArrangement::Dynamic);
-    table.set_header(vec!["Qty", "Name", "Set", "Zustand", "Preis"]);
+    table.set_header(vec![t("header.qty"), t("header.name"), t("header.set"), t("header.condition"), t("header.price")]);
 
     for o in &offers {
         table.add_row(vec![
@@ -225,7 +230,7 @@ pub async fn offers(api: &ApiClient) -> Result<()> {
     Ok(())
 }
 
-// ─── Wants (Gesuche) ────────────────────────────────
+// ─── Wants ───────────────────────────────────────────
 
 pub async fn wants(api: &ApiClient) -> Result<()> {
     let data = api
@@ -240,20 +245,20 @@ pub async fn wants(api: &ApiClient) -> Result<()> {
 
     if wants.is_empty() {
         println!();
-        println!("  Keine Gesuche vorhanden.");
-        println!("  Füge Karten zur Wunschliste hinzu auf https://collected.cards/trades");
+        println!("  {}", t("trade.no_wants"));
+        println!("  {} https://collected.cards/trades", t("trade.add_wants_hint"));
         println!();
         return Ok(());
     }
 
     println!();
-    println!("  🔍 {} Gesuche", wants.len().to_string().cyan());
+    println!("  🔍 {} {}", wants.len().to_string().cyan(), t("trade.wants_count"));
     println!();
 
     let mut table = Table::new();
     table.load_preset(UTF8_BORDERS_ONLY);
     table.set_content_arrangement(ContentArrangement::Dynamic);
-    table.set_header(vec!["Qty", "Name", "TCG", "Preis"]);
+    table.set_header(vec![t("header.qty"), t("header.name"), t("header.tcg"), t("header.price")]);
 
     for w in &wants {
         table.add_row(vec![
@@ -284,13 +289,12 @@ pub async fn matches(api: &ApiClient, limit: Option<i32>) -> Result<()> {
 
     if matches.is_empty() {
         println!();
-        println!("  Keine Matches gefunden.");
-        println!("  Füge mehr Karten zu Angeboten und Gesuchen hinzu!");
+        println!("  {}", t("trade.no_matches"));
+        println!("  {}", t("trade.more_hint"));
         println!();
         return Ok(());
     }
 
-    // Sort by score descending
     matches.sort_by(|a, b| b.match_score.cmp(&a.match_score));
 
     let limit = limit.unwrap_or(10) as usize;
@@ -299,8 +303,10 @@ pub async fn matches(api: &ApiClient, limit: Option<i32>) -> Result<()> {
 
     println!();
     println!(
-        "  🤝 {} Matches (zeige {})",
+        "  🤝 {} {} ({} {})",
         total.to_string().green(),
+        t("trade.matches"),
+        t("trade.showing"),
         matches.len()
     );
     println!();
@@ -308,10 +314,7 @@ pub async fn matches(api: &ApiClient, limit: Option<i32>) -> Result<()> {
     for (i, m) in matches.iter().enumerate() {
         let name = m.display_name.as_deref().unwrap_or(&m.username);
         let loc = m.location_name.as_deref().unwrap_or("?");
-        let dist = m
-            .distance_km
-            .map(|d| format!("{:.0}km", d))
-            .unwrap_or_default();
+        let dist = m.distance_km.map(|d| format!("{:.0}km", d)).unwrap_or_default();
 
         println!(
             "  {}. {} {} ({} {})",
@@ -322,36 +325,20 @@ pub async fn matches(api: &ApiClient, limit: Option<i32>) -> Result<()> {
             dist.dimmed()
         );
 
-        // They have (cards you want)
         if !m.they_have.is_empty() {
-            let cards: Vec<String> = m
-                .they_have
-                .iter()
-                .map(|c| {
-                    let price = c
-                        .card_price
-                        .map(|p| format!(" €{:.2}", p))
-                        .unwrap_or_default();
-                    format!("{}{}", c.card_name, price.dimmed())
-                })
-                .collect();
-            println!("     🟢 Hat: {}", cards.join(", "));
+            let cards: Vec<String> = m.they_have.iter().map(|c| {
+                let price = c.card_price.map(|p| format!(" €{:.2}", p)).unwrap_or_default();
+                format!("{}{}", c.card_name, price.dimmed())
+            }).collect();
+            println!("     🟢 {}: {}", t("trade.has"), cards.join(", "));
         }
 
-        // You have (cards they want)
         if !m.you_have.is_empty() {
-            let cards: Vec<String> = m
-                .you_have
-                .iter()
-                .map(|c| {
-                    let price = c
-                        .card_price
-                        .map(|p| format!(" €{:.2}", p))
-                        .unwrap_or_default();
-                    format!("{}{}", c.card_name, price.dimmed())
-                })
-                .collect();
-            println!("     🔵 Sucht: {}", cards.join(", "));
+            let cards: Vec<String> = m.you_have.iter().map(|c| {
+                let price = c.card_price.map(|p| format!(" €{:.2}", p)).unwrap_or_default();
+                format!("{}{}", c.card_name, price.dimmed())
+            }).collect();
+            println!("     🔵 {}: {}", t("trade.seeks"), cards.join(", "));
         }
 
         if i < matches.len() - 1 {
@@ -361,11 +348,7 @@ pub async fn matches(api: &ApiClient, limit: Option<i32>) -> Result<()> {
 
     if total > limit {
         println!();
-        println!(
-            "  … und {} weitere. Nutze --limit {}",
-            total - limit,
-            total
-        );
+        println!("  … {} {} {}", total - limit, t("trade.and_more"), total);
     }
 
     println!();
@@ -387,8 +370,8 @@ pub async fn tradelist(api: &ApiClient, limit: Option<i32>) -> Result<()> {
 
     if entries.is_empty() {
         println!();
-        println!("  Keine Karten zum Tauschen markiert.");
-        println!("  Markiere Karten in deiner Sammlung mit dem 🤝 Button.");
+        println!("  {}", t("trade.no_tradelist"));
+        println!("  {}", t("trade.mark_button"));
         println!();
         return Ok(());
     }
@@ -408,8 +391,10 @@ pub async fn tradelist(api: &ApiClient, limit: Option<i32>) -> Result<()> {
 
     println!();
     println!(
-        "  🤝 Tradelist — {} Karten ({})",
+        "  🤝 {} — {} {} ({})",
+        t("trade.tradelist"),
         total.to_string().green(),
+        t("trade.tradelist_cards"),
         format!("€{:.2}", total_value).green().bold()
     );
     println!();
@@ -417,7 +402,7 @@ pub async fn tradelist(api: &ApiClient, limit: Option<i32>) -> Result<()> {
     let mut table = Table::new();
     table.load_preset(UTF8_BORDERS_ONLY);
     table.set_content_arrangement(ContentArrangement::Dynamic);
-    table.set_header(vec!["Qty", "Name", "Set", "Nr.", "Zustand", "Foil", "Preis"]);
+    table.set_header(vec![t("header.qty"), t("header.name"), t("header.set"), t("header.number"), t("header.condition"), t("header.foil"), t("header.price")]);
 
     for e in entries.iter().take(limit) {
         let c = e.card.as_ref();
@@ -439,7 +424,7 @@ pub async fn tradelist(api: &ApiClient, limit: Option<i32>) -> Result<()> {
 
     if total > limit {
         println!();
-        println!("  … und {} weitere. Nutze --limit {}", total - limit, total);
+        println!("  … {} {} {}", total - limit, t("common.more_results"), total);
     }
 
     println!();

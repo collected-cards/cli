@@ -5,6 +5,7 @@ use serde_json::json;
 
 use crate::api::{ApiClient, CollectionEntry, CollectionInfo};
 use crate::display;
+use crate::i18n::t;
 
 /// `collected collections` — List user's collections
 pub async fn list_collections(api: &ApiClient) -> Result<()> {
@@ -18,15 +19,15 @@ pub async fn list_collections(api: &ApiClient) -> Result<()> {
         serde_json::from_value(data["myCollections"].clone()).unwrap_or_default();
 
     if collections.is_empty() {
-        println!("  Keine Sammlungen vorhanden.");
-        println!("  Erstelle eine auf {}", "https://collected.cards/collection".cyan());
+        println!("  {}", t("collection.no_collections"));
+        println!("  {} {}", t("collection.create_hint"), "https://collected.cards/collection".cyan());
         return Ok(());
     }
 
     println!(
-        "  {} Sammlung{}",
+        "  {} {}",
         collections.len().to_string().green().bold(),
-        if collections.len() == 1 { "" } else { "en" }
+        if collections.len() == 1 { t("collection.collection") } else { t("collection.collections") }
     );
     println!();
 
@@ -35,7 +36,7 @@ pub async fn list_collections(api: &ApiClient) -> Result<()> {
         .load_preset(UTF8_FULL)
         .apply_modifier(UTF8_ROUND_CORNERS)
         .set_content_arrangement(ContentArrangement::Dynamic)
-        .set_header(vec!["ID", "Name", "TCG", "Karten"]);
+        .set_header(vec![t("header.id"), t("header.name"), t("header.tcg"), t("header.cards")]);
 
     for c in &collections {
         table.add_row(vec![
@@ -61,7 +62,6 @@ pub async fn show_collection(
 
     let limit = limit.unwrap_or(50);
 
-    // First get collections to find the right one
     let data = api
         .query("{ myCollections { id name tcgSlug entryCount } }", None)
         .await?;
@@ -79,8 +79,8 @@ pub async fn show_collection(
     let collection = match collection {
         Some(c) => c,
         None => {
-            println!("  Sammlung '{}' nicht gefunden.", name_or_id.yellow());
-            println!("  Verfügbare Sammlungen:");
+            println!("  {} '{}'.", t("collection.not_found"), name_or_id.yellow());
+            println!("  {}:", t("collection.available"));
             for c in &collections {
                 println!("    • {} ({})", c.name, c.id[..8].to_string().dimmed());
             }
@@ -88,19 +88,15 @@ pub async fn show_collection(
         }
     };
 
-    // Fetch entries
     let data = api
         .query(
-            "query($id: ID!, $limit: Int) { 
-                collectionEntries(collectionId: $id, limit: $limit) { 
+            "query($id: ID!, $limit: Int) {
+                collectionEntries(collectionId: $id, limit: $limit) {
                     id quantity foil condition language
                     card { name setCode setName collectorNumber rarity currentPrice foilPrice }
-                } 
+                }
             }",
-            Some(json!({
-                "id": collection.id,
-                "limit": limit,
-            })),
+            Some(json!({ "id": collection.id, "limit": limit })),
         )
         .await?;
 
@@ -108,9 +104,10 @@ pub async fn show_collection(
         serde_json::from_value(data["collectionEntries"].clone()).unwrap_or_default();
 
     println!(
-        "  {} — {} Karten",
+        "  {} — {} {}",
         collection.name.bold().white(),
-        entries.len().to_string().green()
+        entries.len().to_string().green(),
+        t("collection.cards_count")
     );
 
     let total_value: f64 = entries
@@ -124,12 +121,12 @@ pub async fn show_collection(
         .sum();
 
     if total_value > 0.0 {
-        println!("  Wert: {}", format!("€{:.2}", total_value).green());
+        println!("  {}: {}", t("collection.total_value"), format!("€{:.2}", total_value).green());
     }
     println!();
 
     if entries.is_empty() {
-        println!("  Keine Karten in dieser Sammlung.");
+        println!("  {}", t("collection.no_cards"));
         return Ok(());
     }
 
@@ -138,7 +135,7 @@ pub async fn show_collection(
         .load_preset(UTF8_FULL)
         .apply_modifier(UTF8_ROUND_CORNERS)
         .set_content_arrangement(ContentArrangement::Dynamic)
-        .set_header(vec!["Qty", "Name", "Set", "Nr.", "Zustand", "Foil", "Preis"]);
+        .set_header(vec![t("header.qty"), t("header.name"), t("header.set"), t("header.number"), t("header.condition"), t("header.foil"), t("header.price")]);
 
     for e in &entries {
         let c = e.card.as_ref();
@@ -161,7 +158,7 @@ pub async fn show_collection(
 }
 
 /// `collected stats` — Collection statistics
-pub async fn stats(api: &ApiClient, tcg: Option<&str>) -> Result<()> {
+pub async fn stats(api: &ApiClient, _tcg: Option<&str>) -> Result<()> {
     api.require_auth()?;
 
     let data = api
@@ -175,24 +172,22 @@ pub async fn stats(api: &ApiClient, tcg: Option<&str>) -> Result<()> {
     let collections = stats["collections"].as_array();
 
     println!();
-    println!("  {} Deine Sammlung", "📊".to_string());
+    println!("  {} {}", "📊".to_string(), t("collection.your_collection"));
     println!("  {}", "━".repeat(30).dimmed());
     println!(
-        "  Sammlungen:  {}",
+        "  {}:  {}",
+        t("collection.collections_label"),
         collections.map(|c| c.len()).unwrap_or(0).to_string().green()
     );
     println!(
-        "  Karten:      {}",
+        "  {}:      {}",
+        t("collection.cards_label"),
         stats["totalCards"].as_i64().unwrap_or(0).to_string().green()
     );
     println!(
-        "  Wert:        {}",
-        format!(
-            "€{:.2}",
-            stats["totalValue"].as_f64().unwrap_or(0.0)
-        )
-        .green()
-        .bold()
+        "  {}:        {}",
+        t("collection.value_label"),
+        format!("€{:.2}", stats["totalValue"].as_f64().unwrap_or(0.0)).green().bold()
     );
     let change = stats["valueChange"].as_f64().unwrap_or(0.0);
     if change.abs() > 0.01 {

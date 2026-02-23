@@ -1,7 +1,5 @@
 use anyhow::Result;
 use colored::*;
-use std::io::Write;
-
 use crate::api::CardResult;
 
 /// Detect terminal image capability

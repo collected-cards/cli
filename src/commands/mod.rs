@@ -1,5 +1,14 @@
+pub mod account;
+pub mod add;
 pub mod auth;
 pub mod collection;
+pub mod deck;
+pub mod export;
+pub mod import;
 pub mod market;
+pub mod price;
+pub mod remove;
 pub mod search;
+pub mod settings;
 pub mod trade;
+pub mod wantlist;

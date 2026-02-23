@@ -1,11 +1,12 @@
 use anyhow::Result;
 use colored::*;
 use comfy_table::{modifiers::UTF8_ROUND_CORNERS, presets::UTF8_FULL, ContentArrangement, Table};
-use serde::{Deserialize};
+use serde::Deserialize;
 use serde_json::json;
 
 use crate::api::ApiClient;
 use crate::display;
+use crate::i18n::t;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,7 +33,6 @@ struct ListingInfo {
     item_set: Option<String>,
 }
 
-/// `collected market search <query>` — Search marketplace
 pub async fn search(api: &ApiClient, query: &str, tcg: Option<&str>, limit: Option<i32>) -> Result<()> {
     let limit = limit.unwrap_or(20);
 
@@ -43,11 +43,7 @@ pub async fn search(api: &ApiClient, query: &str, tcg: Option<&str>, limit: Opti
                     itemName itemSet tcgSlug offerCount minPrice maxPrice
                 }
             }",
-            Some(json!({
-                "q": query,
-                "tcg": tcg,
-                "limit": limit,
-            })),
+            Some(json!({ "q": query, "tcg": tcg, "limit": limit })),
         )
         .await?;
 
@@ -55,14 +51,15 @@ pub async fn search(api: &ApiClient, query: &str, tcg: Option<&str>, limit: Opti
         serde_json::from_value(data["searchMarketplaceItems"].clone()).unwrap_or_default();
 
     if items.is_empty() {
-        println!("  Keine Angebote gefunden für: {}", query.yellow());
+        println!("  {} {}", t("market.no_results"), query.yellow());
         return Ok(());
     }
 
     println!(
-        "  {} Marktplatz-Ergebnis{} für {}",
+        "  {} {} {} {}",
         items.len().to_string().green().bold(),
-        if items.len() == 1 { "" } else { "se" },
+        if items.len() == 1 { t("market.results") } else { t("market.results_plural") },
+        t("search.for"),
         query.yellow().bold()
     );
     println!();
@@ -72,7 +69,7 @@ pub async fn search(api: &ApiClient, query: &str, tcg: Option<&str>, limit: Opti
         .load_preset(UTF8_FULL)
         .apply_modifier(UTF8_ROUND_CORNERS)
         .set_content_arrangement(ContentArrangement::Dynamic)
-        .set_header(vec!["Name", "Set", "TCG", "Angebote", "Ab", "Bis"]);
+        .set_header(vec![t("header.name"), t("header.set"), t("header.tcg"), t("header.offers"), t("header.from"), t("header.to")]);
 
     for item in &items {
         table.add_row(vec![
@@ -89,7 +86,6 @@ pub async fn search(api: &ApiClient, query: &str, tcg: Option<&str>, limit: Opti
     Ok(())
 }
 
-/// `collected market listings` — Show own listings
 pub async fn my_listings(api: &ApiClient) -> Result<()> {
     api.require_auth()?;
 
@@ -104,15 +100,15 @@ pub async fn my_listings(api: &ApiClient) -> Result<()> {
         serde_json::from_value(data["myListings"].clone()).unwrap_or_default();
 
     if listings.is_empty() {
-        println!("  Keine aktiven Listings.");
-        println!("  Erstelle eines mit: {}", "collected market sell <card-id> --price <EUR>".cyan());
+        println!("  {}", t("market.no_listings"));
+        println!("  {}: {}", t("market.create_hint"), "collected market sell <card-id> --price <EUR>".cyan());
         return Ok(());
     }
 
     println!(
-        "  {} Listing{}",
+        "  {} {}",
         listings.len().to_string().green().bold(),
-        if listings.len() == 1 { "" } else { "s" }
+        if listings.len() == 1 { t("market.listing") } else { t("market.listings") }
     );
     println!();
 
@@ -121,7 +117,7 @@ pub async fn my_listings(api: &ApiClient) -> Result<()> {
         .load_preset(UTF8_FULL)
         .apply_modifier(UTF8_ROUND_CORNERS)
         .set_content_arrangement(ContentArrangement::Dynamic)
-        .set_header(vec!["ID", "Karte", "Set", "Preis", "Zustand", "Foil", "Status"]);
+        .set_header(vec![t("header.id"), t("header.name"), t("header.set"), t("header.price"), t("header.condition"), t("header.foil"), t("header.status")]);
 
     for l in &listings {
         table.add_row(vec![
@@ -139,7 +135,6 @@ pub async fn my_listings(api: &ApiClient) -> Result<()> {
     Ok(())
 }
 
-/// `collected market sell <card-id> --price <EUR>`
 pub async fn create_listing(
     api: &ApiClient,
     card_id: &str,
@@ -173,8 +168,9 @@ pub async fn create_listing(
     let id = listing["id"].as_str().unwrap_or("?");
 
     println!(
-        "  {} Listing erstellt: {} (€{:.2})",
+        "  {} {}: {} (€{:.2})",
         "✅".to_string(),
+        t("market.listing_created"),
         id[..8].to_string().green(),
         price
     );

@@ -5,45 +5,36 @@ use serde_json::json;
 
 use crate::api::{ApiClient, CardResult};
 use crate::display;
+use crate::i18n::t;
 
 /// `collected search <query>` — Search cards via Meilisearch
 pub async fn search(api: &ApiClient, query: &str, tcg: Option<&str>, limit: Option<i32>) -> Result<()> {
     let limit = limit.unwrap_or(20);
-    
-    let (gql, vars) = if let Some(t) = tcg {
-        (
-            "query($tcg: String!, $q: String!, $limit: Int) { 
-                searchCards(tcg: $tcg, query: $q, limit: $limit) { 
-                    id name setCode setName collectorNumber rarity imageUrl currentPrice
-                } 
-            }",
-            json!({"q": query, "tcg": t, "limit": limit}),
-        )
-    } else {
-        (
-            "query($q: String!, $limit: Int) { 
-                searchCards(tcg: \"\", query: $q, limit: $limit) { 
-                    id name setCode setName collectorNumber rarity imageUrl currentPrice
-                } 
-            }",
-            json!({"q": query, "limit": limit}),
-        )
-    };
 
-    let data = api.query(gql, Some(vars)).await?;
+    let data = api
+        .query(
+            "query($tcg: String, $q: String!, $limit: Int) {
+                searchCards(tcg: $tcg, query: $q, limit: $limit) {
+                    id name setCode setName collectorNumber rarity imageUrl currentPrice
+                }
+            }",
+            Some(json!({ "q": query, "tcg": tcg, "limit": limit })),
+        )
+        .await?;
 
     let cards: Vec<CardResult> =
         serde_json::from_value(data["searchCards"].clone()).unwrap_or_default();
 
     if cards.is_empty() {
-        println!("  Keine Karten gefunden für: {}", query.yellow());
+        println!("  {} {}", t("search.no_results"), query.yellow());
         return Ok(());
     }
 
     println!(
-        "  {} Ergebnis{} für {}",
+        "  {} {} {} {}",
         cards.len().to_string().green().bold(),
-        if cards.len() == 1 { "" } else { "se" },
+        if cards.len() == 1 { t("search.results_count") } else { t("search.results_count_plural") },
+        t("search.for"),
         query.yellow().bold()
     );
     println!();
@@ -53,7 +44,7 @@ pub async fn search(api: &ApiClient, query: &str, tcg: Option<&str>, limit: Opti
         .load_preset(UTF8_FULL)
         .apply_modifier(UTF8_ROUND_CORNERS)
         .set_content_arrangement(ContentArrangement::Dynamic)
-        .set_header(vec!["#", "Name", "Set", "Nr.", "Seltenheit", "Preis"]);
+        .set_header(vec!["#", t("header.name"), t("header.set"), t("header.number"), t("header.rarity"), t("header.price")]);
 
     for (i, card) in cards.iter().enumerate() {
         table.add_row(vec![
@@ -69,8 +60,9 @@ pub async fn search(api: &ApiClient, query: &str, tcg: Option<&str>, limit: Opti
     println!("{table}");
     println!();
     println!(
-        "  {} für Details: {}",
+        "  {} {}: {}",
         "💡".to_string(),
+        t("search.detail_hint"),
         "collected card <name>".cyan()
     );
 
@@ -82,11 +74,11 @@ pub async fn card_detail(api: &ApiClient, query: &str, tcg: Option<&str>, show_a
     let tcg = tcg.unwrap_or("mtg");
     let data = api
         .query(
-            "query($tcg: String!, $q: String!) { 
-                searchCards(tcg: $tcg, query: $q, limit: 1) { 
-                    id name setCode setName collectorNumber rarity imageUrl 
+            "query($tcg: String!, $q: String!) {
+                searchCards(tcg: $tcg, query: $q, limit: 1) {
+                    id name setCode setName collectorNumber rarity imageUrl
                     currentPrice typeLine manaCost oracleText power toughness
-                } 
+                }
             }",
             Some(json!({ "tcg": tcg, "q": query })),
         )
@@ -98,12 +90,11 @@ pub async fn card_detail(api: &ApiClient, query: &str, tcg: Option<&str>, show_a
     let card = match cards.first() {
         Some(c) => c,
         None => {
-            println!("  Keine Karte gefunden für: {}", query.yellow());
+            println!("  {} {}", t("search.no_card_found"), query.yellow());
             return Ok(());
         }
     };
 
-    // Show card image if requested
     if show_art {
         if let Some(ref url) = card.image_url {
             let full_url = if url.starts_with("http") {
@@ -114,7 +105,6 @@ pub async fn card_detail(api: &ApiClient, query: &str, tcg: Option<&str>, show_a
             match display::show_card_image(&full_url, image_mode).await {
                 Ok(_) => {}
                 Err(_) => {
-                    // Fallback to ASCII
                     display::print_ascii_card(card);
                     return Ok(());
                 }
@@ -124,11 +114,11 @@ pub async fn card_detail(api: &ApiClient, query: &str, tcg: Option<&str>, show_a
 
     display::print_card_detail(card);
 
-    // If not showing art, offer ASCII card
     if !show_art {
         println!(
-            "  {} Bild anzeigen: {}",
+            "  {} {}: {}",
             "🎨".to_string(),
+            t("search.show_art"),
             format!("collected card \"{}\" --art", card.name).cyan()
         );
         println!();

@@ -1,14 +1,10 @@
 [package]
 name = "collected"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "CLI for collected.cards — manage your TCG collection from the terminal"
-license = "LicenseRef-collected"
+license = "MIT"
 repository = "https://github.com/collected-cards/cli"
-homepage = "https://collected.cards"
-readme = "README.md"
-keywords = ["tcg", "magic", "pokemon", "yugioh", "collection"]
-categories = ["command-line-utilities"]
 
 [[bin]]
 name = "collected"

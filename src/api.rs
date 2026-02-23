@@ -33,6 +33,11 @@ impl ApiClient {
     pub fn new(config: &Config) -> Result<Self> {
         let client = Client::builder()
             .timeout(std::time::Duration::from_secs(30))
+            .connect_timeout(std::time::Duration::from_secs(10))
+            // Enforce HTTPS certificate validation (default, but explicit)
+            .danger_accept_invalid_certs(false)
+            // Only allow HTTPS for the API endpoint
+            .https_only(config.api.endpoint.starts_with("https://"))
             .build()?;
 
         Ok(Self {
@@ -44,7 +49,7 @@ impl ApiClient {
 
     pub fn require_auth(&self) -> Result<()> {
         if self.token.is_none() {
-            bail!("Nicht angemeldet. Nutze 'collected auth login' zum Einloggen.");
+            bail!("{} — collected auth login", crate::i18n::t("auth.not_logged_in"));
         }
         Ok(())
     }
@@ -60,21 +65,44 @@ impl ApiClient {
             builder = builder.header("Authorization", format!("Bearer {}", token));
         }
 
-        let resp = builder.send().await.context("API nicht erreichbar")?;
+        let resp = builder.send().await
+            .map_err(|_| anyhow::anyhow!("{}", crate::i18n::t("common.api_unreachable")))?;
         let status = resp.status();
         if !status.is_success() {
-            bail!("API-Fehler: HTTP {}", status);
+            bail!("{} (HTTP {})", crate::i18n::t("common.api_error"), status.as_u16());
         }
 
-        let body: GqlResponse = resp.json().await.context("Ungültige API-Antwort")?;
+        let body: GqlResponse = resp.json().await
+            .map_err(|_| anyhow::anyhow!("{}", crate::i18n::t("common.api_invalid_response")))?;
 
         if let Some(errors) = body.errors {
-            let msgs: Vec<_> = errors.iter().map(|e| e.message.as_str()).collect();
-            bail!("API-Fehler: {}", msgs.join(", "));
+            // Sanitize error messages: only show user-facing parts
+            let msgs: Vec<_> = errors.iter().map(|e| {
+                sanitize_error(&e.message)
+            }).collect();
+            bail!("{}", msgs.join(", "));
         }
 
-        body.data.context("Keine Daten in API-Antwort")
+        body.data.ok_or_else(|| anyhow::anyhow!("{}", crate::i18n::t("common.api_no_data")))
     }
+}
+
+/// Sanitize API error messages — strip internal details (SQL, stack traces, paths)
+fn sanitize_error(msg: &str) -> String {
+    // Strip common internal prefixes
+    let msg = msg.trim();
+    // Don't leak SQL errors, file paths, or stack traces
+    if msg.contains("SELECT ") || msg.contains("INSERT ") || msg.contains("DELETE ")
+        || msg.contains("/opt/") || msg.contains("panicked at")
+        || msg.contains("sqlx::") || msg.contains("tokio::")
+    {
+        return crate::i18n::t("common.api_error").to_string();
+    }
+    // Truncate overly long messages
+    if msg.len() > 200 {
+        return format!("{}…", &msg[..200]);
+    }
+    msg.to_string()
 }
 
 // ─── Response Types ──────────────────────────────────────────────
