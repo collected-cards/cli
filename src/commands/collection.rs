@@ -55,7 +55,7 @@ pub async fn list_collections(api: &ApiClient) -> Result<()> {
 pub async fn show_collection(
     api: &ApiClient,
     name_or_id: &str,
-    sort: Option<&str>,
+    _sort: Option<&str>,
     limit: Option<i32>,
 ) -> Result<()> {
     api.require_auth()?;

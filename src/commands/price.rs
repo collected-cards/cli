@@ -9,7 +9,6 @@ use crate::i18n::t;
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PricePoint {
-    date: String,
     price: f64,
 }
 
@@ -21,7 +20,7 @@ pub async fn price_history(api: &ApiClient, query: &str, tcg: Option<&str>, peri
         .query(
             "query($tcg: String!, $q: String!) {
                 searchCards(tcg: $tcg, query: $q, limit: 1) {
-                    id name setCode setName currentPrice foilPrice
+                    id name setCode setName currentPrice bracket gameChanger
                 }
             }",
             Some(json!({ "tcg": tcg, "q": query })),
@@ -42,7 +41,7 @@ pub async fn price_history(api: &ApiClient, query: &str, tcg: Option<&str>, peri
     // Get price history
     let data = api
         .query(
-            "query($cardId: ID!, $period: String!) { priceHistory(cardId: $cardId, period: $period) { date price } }",
+            "query($cardId: ID!, $period: String!) { priceHistory(cardId: $cardId, period: $period) { price } }",
             Some(json!({ "cardId": card.id, "period": period })),
         )
         .await?;
@@ -51,7 +50,29 @@ pub async fn price_history(api: &ApiClient, query: &str, tcg: Option<&str>, peri
         serde_json::from_value(data["priceHistory"].clone()).unwrap_or_default();
 
     println!();
-    println!("  {} {} — {}", "📈".to_string(), t("price.history"), card.name.bold().white());
+    let bracket_str = if card.game_changer.unwrap_or(false) {
+        format!(" {}", "⚠ Game Changer".red())
+    } else if let Some(bracket) = card.bracket {
+        if bracket > 0 {
+            let bracket_badge = format!("}}{}{{", bracket);
+            let colored_bracket = match bracket {
+                1 => bracket_badge.white(),
+                2 => bracket_badge.green(),
+                3 => bracket_badge.blue(),
+                4 => bracket_badge.purple(),
+                5 => bracket_badge.yellow(),
+                6 => bracket_badge.red(),
+                _ => bracket_badge.normal(),
+            };
+            format!(" {}", colored_bracket)
+        } else {
+            String::new()
+        }
+    } else {
+        String::new()
+    };
+
+    println!("  {} {} — {}{}", "📈".to_string(), t("price.history"), card.name.bold().white(), bracket_str);
     println!("  {}: {}", t("price.period"), period.cyan());
 
     if let Some(price) = card.current_price {
@@ -69,18 +90,11 @@ pub async fn price_history(api: &ApiClient, query: &str, tcg: Option<&str>, peri
     let max_price = history.iter().map(|p| p.price).fold(0.0f64, f64::max);
     let chart_width = 40;
 
-    for point in &history {
+    for (i, point) in history.iter().enumerate() {
         let bar_len = if max_price > 0.0 {
             ((point.price / max_price) * chart_width as f64) as usize
         } else {
             0
-        };
-
-        // Shorten date (take last 5 chars or date part)
-        let date_short = if point.date.len() >= 10 {
-            &point.date[5..10]
-        } else {
-            &point.date
         };
 
         let bar = "█".repeat(bar_len);
@@ -92,9 +106,10 @@ pub async fn price_history(api: &ApiClient, query: &str, tcg: Option<&str>, peri
             bar.red()
         };
 
+        let label = format!("{:>3}", i + 1);
         println!(
             "  {} {} €{:.2}",
-            date_short.dimmed(),
+            label.dimmed(),
             colored_bar,
             point.price
         );

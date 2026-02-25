@@ -9,6 +9,7 @@ use crate::display;
 use crate::i18n::t;
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 #[serde(rename_all = "camelCase")]
 struct MarketplaceItem {
     item_name: Option<String>,
@@ -21,6 +22,7 @@ struct MarketplaceItem {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 #[serde(rename_all = "camelCase")]
 struct ListingInfo {
     id: String,

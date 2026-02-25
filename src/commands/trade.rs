@@ -10,6 +10,7 @@ use crate::i18n::t;
 // ─── Types ───────────────────────────────────────────
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 #[serde(rename_all = "camelCase")]
 struct TradeProfile {
     display_name: Option<String>,
@@ -22,6 +23,7 @@ struct TradeProfile {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 #[serde(rename_all = "camelCase")]
 struct TradeStats {
     active_traders: i32,
@@ -35,6 +37,7 @@ struct TradeStats {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 #[serde(rename_all = "camelCase")]
 struct TradeOffer {
     id: String,
@@ -46,6 +49,7 @@ struct TradeOffer {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 #[serde(rename_all = "camelCase")]
 struct TradeWant {
     id: String,
@@ -56,6 +60,7 @@ struct TradeWant {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 #[serde(rename_all = "camelCase")]
 struct TradeMatch {
     username: String,
@@ -68,6 +73,7 @@ struct TradeMatch {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 #[serde(rename_all = "camelCase")]
 struct TradeMatchCard {
     card_name: String,
@@ -77,6 +83,7 @@ struct TradeMatchCard {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 #[serde(rename_all = "camelCase")]
 struct TradeAccess {
     radius_km: i32,

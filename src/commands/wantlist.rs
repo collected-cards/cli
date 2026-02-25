@@ -11,19 +11,27 @@ use crate::i18n::t;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct WantlistItem {
     id: String,
-    card_name: String,
-    card_price: Option<f64>,
-    tcg_slug: Option<String>,
-    quantity: i32,
+    priority: i32,
+    notes: Option<String>,
+    card: WantlistCard,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WantlistCard {
+    name: String,
+    set_code: Option<String>,
+    current_price: Option<f64>,
 }
 
 pub async fn show_wantlist(api: &ApiClient) -> Result<()> {
     api.require_auth()?;
 
     let data = api
-        .query("{ myWantlist { id cardName cardPrice tcgSlug quantity } }", None)
+        .query("{ myWantlist { id priority notes card { name setCode currentPrice } } }", None)
         .await?;
 
     let items: Vec<WantlistItem> =
@@ -41,15 +49,15 @@ pub async fn show_wantlist(api: &ApiClient) -> Result<()> {
     let mut table = Table::new();
     table.load_preset(UTF8_BORDERS_ONLY);
     table.set_content_arrangement(ContentArrangement::Dynamic);
-    table.set_header(vec!["#", t("header.qty"), t("header.name"), t("header.tcg"), t("header.price")]);
+    table.set_header(vec!["#", t("header.name"), "Set", t("header.price"), "Prio"]);
 
     for (i, item) in items.iter().enumerate() {
         table.add_row(vec![
             (i + 1).to_string(),
-            format!("{}x", item.quantity),
-            item.card_name.clone(),
-            item.tcg_slug.clone().unwrap_or_default().to_uppercase(),
-            display::format_price(item.card_price),
+            item.card.name.clone(),
+            item.card.set_code.clone().unwrap_or_default().to_uppercase(),
+            display::format_price(item.card.current_price),
+            format!("★{}", item.priority),
         ]);
     }
 
@@ -63,7 +71,7 @@ pub async fn add_to_wantlist(api: &ApiClient, card_name: &str, tcg: Option<&str>
 
     let tcg = tcg.unwrap_or("mtg");
 
-    // Search to validate
+    // Search for the card to get its ID
     let data = api
         .query(
             "query($tcg: String!, $q: String!, $limit: Int) {
@@ -76,11 +84,13 @@ pub async fn add_to_wantlist(api: &ApiClient, card_name: &str, tcg: Option<&str>
     let cards: Vec<CardResult> =
         serde_json::from_value(data["searchCards"].clone()).unwrap_or_default();
 
-    let name = if cards.is_empty() {
-        // Use the raw name
-        card_name.to_string()
-    } else if cards.len() == 1 {
-        cards[0].name.clone()
+    if cards.is_empty() {
+        println!("  {} {}", t("search.no_card_found"), card_name.yellow());
+        return Ok(());
+    }
+
+    let (card_id, name) = if cards.len() == 1 {
+        (cards[0].id.clone(), cards[0].name.clone())
     } else {
         let names: Vec<String> = cards.iter().map(|c| {
             let set = c.set_code.as_deref().unwrap_or("").to_uppercase();
@@ -91,16 +101,15 @@ pub async fn add_to_wantlist(api: &ApiClient, card_name: &str, tcg: Option<&str>
             .items(&names)
             .default(0)
             .interact()?;
-        cards[idx].name.clone()
+        (cards[idx].id.clone(), cards[idx].name.clone())
     };
 
     api.query(
-        "mutation($cardName: String!, $tcgSlug: String!) { addToWantlist(cardName: $cardName, tcgSlug: $tcgSlug) }",
-        Some(json!({ "cardName": name, "tcgSlug": tcg })),
+        "mutation($cardId: ID!) { addToWantlist(cardId: $cardId) { id } }",
+        Some(json!({ "cardId": card_id })),
     ).await?;
 
-    println!("  {} {} {}", "✅".to_string(), t("wantlist.added"), name.green().bold());
-
+    println!("  {} {} {}", "✅", t("wantlist.added"), name.green().bold());
     Ok(())
 }
 
@@ -112,7 +121,6 @@ pub async fn remove_from_wantlist(api: &ApiClient, id: &str) -> Result<()> {
         Some(json!({ "id": id })),
     ).await?;
 
-    println!("  {} {}", "✅".to_string(), t("wantlist.removed"));
-
+    println!("  {} {}", "✅", t("wantlist.removed"));
     Ok(())
 }

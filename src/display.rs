@@ -36,6 +36,20 @@ pub fn detect_image_mode(preference: &str) -> ImageMode {
     ImageMode::Sixel
 }
 
+/// Try to get a higher-resolution image URL
+fn upgrade_image_url(url: &str) -> String {
+    // Scryfall: replace /small/ or /normal/ with /large/ or /png/
+    let upgraded = url
+        .replace("/small/", "/large/")
+        .replace("/normal/", "/large/");
+    // tcgcache: replace /small/ with /high/ or just use large
+    let upgraded = upgraded
+        .replace("/img/mtg/small/", "/img/mtg/large/")
+        .replace("/img/pokemon/en/", "/img/pokemon/en/")  // already good
+        .replace("/low.webp", "/high.webp");
+    upgraded
+}
+
 /// Display card image in terminal using viuer
 pub async fn show_card_image(image_url: &str, config_mode: &str) -> Result<()> {
     let mode = detect_image_mode(config_mode);
@@ -43,15 +57,39 @@ pub async fn show_card_image(image_url: &str, config_mode: &str) -> Result<()> {
         return Ok(());
     }
 
-    // Download image
+    // Try high-res first, fall back to original
+    let hires_url = upgrade_image_url(image_url);
     let client = reqwest::Client::new();
-    let resp = client.get(image_url).send().await?;
-    let bytes = resp.bytes().await?;
+
+    let bytes = match client.get(&hires_url).send().await {
+        Ok(resp) if resp.status().is_success() => resp.bytes().await?,
+        _ => {
+            // Fallback to original URL
+            let resp = client.get(image_url).send().await?;
+            resp.bytes().await?
+        }
+    };
     let img = image::load_from_memory(&bytes)?;
 
+    // Use full terminal width minus small margin
+    let (term_w, term_h) = terminal_size::terminal_size()
+        .map(|(w, h)| (w.0 as u32, h.0 as u32))
+        .unwrap_or_else(|| {
+            // Fallback: try COLUMNS/LINES env vars
+            let w = std::env::var("COLUMNS").ok().and_then(|v| v.parse().ok()).unwrap_or(80);
+            let h = std::env::var("LINES").ok().and_then(|v| v.parse().ok()).unwrap_or(40);
+            (w, h)
+        });
+
+    // Card aspect ratio ~0.715 (width/height). Use up to 90% of terminal height.
+    let max_height = (term_h * 9 / 10).max(20);
+    // Width from height: each char is ~2 pixels tall (halfblock), ~1 pixel wide
+    // So for a card that's 1.4x taller than wide, width = height * 0.715 / 2 * 2 ≈ height * 0.715
+    let width_from_height = (max_height as f32 * 0.72) as u32;
+    let img_width = width_from_height.max(20).min(term_w - 4);
+
     let conf = viuer::Config {
-        width: Some(40),
-        height: Some(20),
+        width: Some(img_width),
         absolute_offset: false,
         ..Default::default()
     };
@@ -121,6 +159,8 @@ pub fn print_card_detail(card: &CardResult) {
 }
 
 /// Print a separator line
+
+#[allow(dead_code)]
 pub fn separator() {
     println!("{}", "─".repeat(60).dimmed());
 }
@@ -133,7 +173,152 @@ pub fn format_price(price: Option<f64>) -> String {
     }
 }
 
+/// Beautiful virtual card with all info — replaces pixel image
+pub fn print_virtual_card(card: &CardResult) {
+    let name = &card.name;
+    let mana = card.mana_cost.as_deref().unwrap_or("");
+    let type_line = card.type_line.as_deref().unwrap_or("");
+    let oracle = card.oracle_text.as_deref().unwrap_or("");
+    let set = card.set_code.as_deref().unwrap_or("???").to_uppercase();
+    let set_name = card.set_name.as_deref().unwrap_or("");
+    let rarity = card.rarity.as_deref().unwrap_or("");
+    let cn = card.collector_number.as_deref().unwrap_or("");
+    let pt = match (&card.power, &card.toughness) {
+        (Some(p), Some(t)) => format!(" ⚔ {}/{}", p, t),
+        _ => String::new(),
+    };
+
+    // Terminal width detection
+    let term_w = terminal_size::terminal_size()
+        .map(|(w, _)| w.0 as usize)
+        .unwrap_or_else(|| {
+            std::env::var("COLUMNS").ok().and_then(|v| v.parse().ok()).unwrap_or(72)
+        });
+    let w = (term_w - 4).min(60).max(36);
+    let inner = w - 4;
+
+    // Rarity color
+    let rarity_color = match rarity {
+        "mythic" => "red",
+        "rare" => "yellow",
+        "uncommon" => "cyan",
+        _ => "white",
+    };
+
+    // Mana cost prettified: {W}{U}{B} → ⬜🔵⚫ 
+    let mana_pretty = prettify_mana(mana);
+    
+    // Price + bracket line
+    let price_str = match card.current_price {
+        Some(p) if p > 0.0 => format!("€{:.2}", p),
+        _ => "—".to_string(),
+    };
+    let bracket_str = if card.game_changer.unwrap_or(false) {
+        " ⚠ Game Changer".to_string()
+    } else {
+        match card.bracket {
+            Some(1) => " }1{ Exhibition".to_string(),
+            Some(2) => " }2{ Core".to_string(),
+            Some(3) => " }3{ Upgraded".to_string(),
+            Some(4) => " }4{ Optimized".to_string(),
+            Some(5) => " }5{ cEDH".to_string(),
+            Some(6) => " }GC{ Game Changer".to_string(),
+            _ => String::new(),
+        }
+    };
+
+    // ── Top border ──
+    println!("  ╭{}╮", "─".repeat(w - 2));
+    
+    // ── Name + Mana ──
+    let name_space = inner - mana_pretty.chars().count();
+    let name_display = truncate(name, name_space);
+    println!("  │ {}{}{} │", 
+        name_display.bold().white(),
+        " ".repeat(inner - name_display.chars().count() - mana_pretty.chars().count()),
+        mana_pretty.yellow(),
+    );
+
+    // ── Separator ──
+    println!("  ├{}┤", "─".repeat(w - 2));
+
+    // ── Type line ──
+    let type_with_pt = if pt.is_empty() {
+        type_line.to_string()
+    } else {
+        format!("{}{}", type_line, pt)
+    };
+    println!("  │ {}{} │",
+        truncate(&type_with_pt, inner).cyan(),
+        " ".repeat(inner.saturating_sub(type_with_pt.chars().count())),
+    );
+
+    // ── Oracle text ──
+    if !oracle.is_empty() {
+        println!("  ├{}┤", "╌".repeat(w - 2));
+        let wrapped = wrap_text(oracle, inner);
+        for line in &wrapped {
+            println!("  │ {}{} │", line, " ".repeat(inner.saturating_sub(line.chars().count())));
+        }
+    }
+
+    // ── Separator ──
+    println!("  ├{}┤", "─".repeat(w - 2));
+
+    // ── Set + Rarity ──
+    let set_line = format!("{} · #{} · {}", set, cn, rarity);
+    let set_display = truncate(&set_line, inner);
+    let colored_set = match rarity_color {
+        "red" => set_display.red(),
+        "yellow" => set_display.yellow(),
+        "cyan" => set_display.cyan(),
+        _ => set_display.white(),
+    };
+    println!("  │ {}{} │",
+        colored_set,
+        " ".repeat(inner.saturating_sub(set_line.chars().count())),
+    );
+
+    // ── Price + Bracket ──
+    let price_line = format!("{}{}", price_str, bracket_str);
+    let price_display = truncate(&price_line, inner);
+    println!("  │ {}{} │",
+        price_display.green().bold(),
+        " ".repeat(inner.saturating_sub(price_line.chars().count())),
+    );
+
+    // ── Set name (small) ──
+    if !set_name.is_empty() {
+        let sn = truncate(set_name, inner);
+        println!("  │ {}{} │",
+            sn.dimmed(),
+            " ".repeat(inner.saturating_sub(set_name.chars().count())),
+        );
+    }
+
+    // ── Bottom border ──
+    println!("  ╰{}╯", "─".repeat(w - 2));
+}
+
+/// Convert {W}{U}{B}{R}{G}{C} mana symbols to colored text
+fn prettify_mana(mana: &str) -> String {
+    if mana.is_empty() { return String::new(); }
+    mana.replace("{W}", "◈W")
+        .replace("{U}", "◈U")
+        .replace("{B}", "◈B")
+        .replace("{R}", "◈R")
+        .replace("{G}", "◈G")
+        .replace("{C}", "◈C")
+        .replace("{X}", "X")
+        .replace("{T}", "⟳")
+        .replace("{", "")
+        .replace("}", "")
+}
+
 /// ASCII art card frame (fallback when no image protocol available)
+#[allow(dead_code)]
+
+#[allow(dead_code)]
 pub fn print_ascii_card(card: &CardResult) {
     let name = &card.name;
     let mana = card.mana_cost.as_deref().unwrap_or("");

@@ -7,6 +7,7 @@ use crate::i18n::t;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct FlatEntry {
     card_name: Option<String>,
     set_code: Option<String>,

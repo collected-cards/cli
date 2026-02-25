@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -105,6 +105,7 @@ fn sanitize_error(msg: &str) -> String {
 // ─── Response Types ──────────────────────────────────────────────
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 #[serde(rename_all = "camelCase")]
 pub struct UserInfo {
     pub id: String,
@@ -114,6 +115,7 @@ pub struct UserInfo {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 #[serde(rename_all = "camelCase")]
 pub struct CardResult {
     pub id: String,
@@ -130,9 +132,12 @@ pub struct CardResult {
     pub oracle_text: Option<String>,
     pub power: Option<String>,
     pub toughness: Option<String>,
+    pub bracket: Option<i32>,
+    pub game_changer: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 #[serde(rename_all = "camelCase")]
 pub struct CollectionInfo {
     pub id: String,
@@ -142,6 +147,7 @@ pub struct CollectionInfo {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 #[serde(rename_all = "camelCase")]
 pub struct CollectionEntry {
     pub id: String,
@@ -153,6 +159,7 @@ pub struct CollectionEntry {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 #[serde(rename_all = "camelCase")]
 pub struct CardInfo {
     pub name: Option<String>,
@@ -165,10 +172,45 @@ pub struct CardInfo {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 #[serde(rename_all = "camelCase")]
 pub struct PlatformStats {
     pub total_cards: i64,
     pub total_users: i64,
     pub total_value: f64,
     pub total_listings: i64,
+}
+
+/// Fetch card detail from tcgcache to get oracle_text, type_line, mana_cost
+pub async fn fetch_tcgcache_detail(card: &CardResult) -> Option<CardResult> {
+    let url = card.image_url.as_deref()?;
+    let scryfall_id = url.rsplit('/').next()?.split('.').next()?;
+    if scryfall_id.len() < 30 { return None; }
+
+    let api_url = format!("https://collected.cards/api/mtg/cards/{}", scryfall_id);
+    let client = reqwest::Client::new();
+    let resp = client.get(&api_url)
+        .timeout(std::time::Duration::from_secs(3))
+        .send().await.ok()?;
+    if !resp.status().is_success() { return None; }
+    let data: serde_json::Value = resp.json().await.ok()?;
+
+    Some(CardResult {
+        id: card.id.clone(),
+        name: data["name"].as_str().unwrap_or(&card.name).to_string(),
+        set_code: card.set_code.clone(),
+        set_name: data["set_name"].as_str().map(|s| s.to_string()).or(card.set_name.clone()),
+        collector_number: card.collector_number.clone(),
+        rarity: data["rarity"].as_str().map(|s| s.to_string()).or(card.rarity.clone()),
+        image_url: card.image_url.clone(),
+        current_price: card.current_price,
+        foil_price: card.foil_price,
+        type_line: data["type_line"].as_str().map(|s| s.to_string()),
+        mana_cost: data["mana_cost"].as_str().map(|s| s.to_string()),
+        oracle_text: data["oracle_text"].as_str().map(|s| s.to_string()),
+        power: data["power"].as_str().map(|s| s.to_string()),
+        toughness: data["toughness"].as_str().map(|s| s.to_string()),
+        bracket: card.bracket,
+        game_changer: card.game_changer,
+    })
 }

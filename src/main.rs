@@ -1,4 +1,5 @@
 mod api;
+mod cache;
 mod commands;
 mod config;
 mod display;
@@ -6,6 +7,7 @@ mod i18n;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use clap_complete::Shell;
 #[derive(Parser)]
 #[command(
     name = "collected",
@@ -13,7 +15,7 @@ use clap::{Parser, Subcommand};
     version,
     author = "collected.cards"
 )]
-struct Cli {
+pub struct Cli {
     #[command(subcommand)]
     command: Commands,
 }
@@ -36,6 +38,9 @@ enum Commands {
         /// Max results
         #[arg(long, short)]
         limit: Option<i32>,
+        /// Skip cache and fetch fresh data
+        #[arg(long)]
+        no_cache: bool,
     },
 
     /// Show card detail
@@ -65,8 +70,8 @@ enum Commands {
         limit: Option<i32>,
     },
 
-    /// Collection statistics
-    Stats {
+    /// Collection statistics (deprecated - use stats command)
+    CollectionStats {
         /// Filter by TCG
         #[arg(long)]
         tcg: Option<String>,
@@ -174,6 +179,51 @@ enum Commands {
         #[command(subcommand)]
         action: TradeAction,
     },
+
+    /// Platform and collection statistics
+    Stats,
+
+    /// Show a random card
+    Random {
+        /// Filter by TCG (mtg, pokemon, yugioh, ...)
+        #[arg(long)]
+        tcg: Option<String>,
+    },
+
+    /// Generate shell completions
+    Completions {
+        /// Shell type
+        shell: Shell,
+    },
+
+    /// Update CLI to latest version
+    Update,
+
+    /// Bulk add cards from file
+    BulkAdd {
+        /// Text file path (one card per line)
+        file: String,
+        /// Target collection name
+        #[arg(long)]
+        collection: Option<String>,
+        /// TCG for all cards
+        #[arg(long)]
+        tcg: Option<String>,
+    },
+
+    /// Compare two cards side by side
+    Compare {
+        /// First card name
+        card1: String,
+        /// Second card name 
+        card2: String,
+        /// TCG (default: mtg)
+        #[arg(long, default_value = "mtg")]
+        tcg: String,
+    },
+
+    /// Show portfolio value with trend
+    Portfolio,
 }
 
 #[derive(Subcommand)]
@@ -202,6 +252,11 @@ enum DeckAction {
         /// Format: arena, moxfield, text
         #[arg(long, short, default_value = "text")]
         format: String,
+    },
+    /// Show bracket analysis for a deck
+    Bracket {
+        /// Deck name or ID
+        name: String,
     },
 }
 
@@ -297,9 +352,9 @@ async fn main() -> Result<()> {
         },
 
         // ─── Search ──────────────────────────────────────
-        Commands::Search { query, tcg, limit } => {
+        Commands::Search { query, tcg, limit, no_cache } => {
             let api = api::ApiClient::new(&config)?;
-            commands::search::search(&api, &query, tcg.as_deref(), limit).await?;
+            commands::search::search(&api, &query, tcg.as_deref(), limit, no_cache).await?;
         }
 
         // ─── Card Detail ─────────────────────────────────
@@ -319,8 +374,8 @@ async fn main() -> Result<()> {
             commands::collection::show_collection(&api, &name, sort.as_deref(), limit).await?;
         }
 
-        // ─── Stats ───────────────────────────────────────
-        Commands::Stats { tcg } => {
+        // ─── Collection Stats (old) ──────────────────────
+        Commands::CollectionStats { tcg } => {
             let api = api::ApiClient::new(&config)?;
             commands::collection::stats(&api, tcg.as_deref()).await?;
         }
@@ -360,6 +415,7 @@ async fn main() -> Result<()> {
                 DeckAction::List => commands::deck::list_decks(&api).await?,
                 DeckAction::Show { name } => commands::deck::show_deck(&api, &name).await?,
                 DeckAction::Export { name, format } => commands::deck::export_deck(&api, &name, &format).await?,
+                DeckAction::Bracket { name } => commands::deck_bracket::deck_bracket_analysis(&api, &name).await?,
             }
         }
 
@@ -428,6 +484,40 @@ async fn main() -> Result<()> {
                     ).await?;
                 }
             }
+        }
+
+        // ─── New Commands ────────────────────────────────
+        Commands::Stats => {
+            let api = api::ApiClient::new(&config)?;
+            commands::stats::platform_stats(&api).await?;
+        }
+
+        Commands::Random { tcg } => {
+            let api = api::ApiClient::new(&config)?;
+            commands::random::random_card(&api, tcg.as_deref()).await?;
+        }
+
+        Commands::Completions { shell } => {
+            commands::completions::generate_completions(shell)?;
+        }
+
+        Commands::Update => {
+            commands::update::self_update().await?;
+        }
+
+        Commands::BulkAdd { file, collection, tcg } => {
+            let api = api::ApiClient::new(&config)?;
+            commands::bulk_add::bulk_add_cards(&api, &file, collection.as_deref(), tcg.as_deref()).await?;
+        }
+
+        Commands::Compare { card1, card2, tcg } => {
+            let api = api::ApiClient::new(&config)?;
+            commands::compare::compare_cards(&api, &card1, &card2, Some(&tcg)).await?;
+        }
+
+        Commands::Portfolio => {
+            let api = api::ApiClient::new(&config)?;
+            commands::portfolio::portfolio(&api).await?;
         }
     }
 

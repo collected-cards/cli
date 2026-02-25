@@ -200,7 +200,7 @@ pub async fn import_file(
                     total_imported += count;
                     eprint!("\r  {} {} {}", "📥".to_string(), total_imported.to_string().green(), t("import.cards_processed"));
                 }
-                Err(e) => {
+                Err(_e) => {
                     eprintln!("\n  {} Batch error at line {}: {}", "⚠️".to_string(), line_num, t("common.api_error"));
                     total_skipped += count;
                 }

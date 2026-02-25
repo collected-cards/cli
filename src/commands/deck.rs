@@ -8,16 +8,18 @@ use crate::api::ApiClient;
 use crate::i18n::t;
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 #[serde(rename_all = "camelCase")]
 struct DeckInfo {
     id: String,
     name: String,
     tcg_slug: Option<String>,
-    card_count: Option<i32>,
+    entry_count: Option<i32>,
     format: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 #[serde(rename_all = "camelCase")]
 struct DeckDetail {
     id: String,
@@ -28,6 +30,7 @@ struct DeckDetail {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 #[serde(rename_all = "camelCase")]
 struct DeckCard {
     card_name: Option<String>,
@@ -41,7 +44,7 @@ pub async fn list_decks(api: &ApiClient) -> Result<()> {
     api.require_auth()?;
 
     let data = api
-        .query("{ myDecks { id name tcgSlug cardCount format } }", None)
+        .query("{ myDecks { id name tcgSlug entryCount format } }", None)
         .await?;
 
     let decks: Vec<DeckInfo> =
@@ -72,7 +75,7 @@ pub async fn list_decks(api: &ApiClient) -> Result<()> {
             d.name.clone(),
             d.tcg_slug.clone().unwrap_or_default().to_uppercase(),
             d.format.clone().unwrap_or_default(),
-            d.card_count.unwrap_or(0).to_string(),
+            d.entry_count.unwrap_or(0).to_string(),
         ]);
     }
 
@@ -85,7 +88,7 @@ pub async fn show_deck(api: &ApiClient, name: &str) -> Result<()> {
 
     // Find deck by name
     let data = api
-        .query("{ myDecks { id name tcgSlug cardCount format } }", None)
+        .query("{ myDecks { id name tcgSlug entryCount format } }", None)
         .await?;
 
     let decks: Vec<DeckInfo> =
@@ -139,7 +142,7 @@ pub async fn export_deck(api: &ApiClient, name: &str, format: &str) -> Result<()
     api.require_auth()?;
 
     let data = api
-        .query("{ myDecks { id name tcgSlug cardCount format } }", None)
+        .query("{ myDecks { id name tcgSlug entryCount format } }", None)
         .await?;
 
     let decks: Vec<DeckInfo> =
