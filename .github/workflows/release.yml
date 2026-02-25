@@ -16,15 +16,23 @@ jobs:
           - target: x86_64-unknown-linux-musl
             os: ubuntu-latest
             artifact: collected-linux-amd64
+            ext: ""
           - target: aarch64-unknown-linux-musl
             os: ubuntu-latest
             artifact: collected-linux-arm64
+            ext: ""
           - target: x86_64-apple-darwin
             os: macos-latest
             artifact: collected-macos-amd64
+            ext: ""
           - target: aarch64-apple-darwin
             os: macos-latest
             artifact: collected-macos-arm64
+            ext: ""
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            artifact: collected-windows-amd64
+            ext: ".exe"
 
     runs-on: ${{ matrix.os }}
 
@@ -52,14 +60,27 @@ jobs:
         if: matrix.target != 'aarch64-unknown-linux-musl'
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Rename binary
+      - name: Rename binary (Unix)
+        if: runner.os != 'Windows'
         run: cp target/${{ matrix.target }}/release/collected ${{ matrix.artifact }}
 
-      - name: Upload artifact
+      - name: Rename binary (Windows)
+        if: runner.os == 'Windows'
+        run: cp target/${{ matrix.target }}/release/collected.exe ${{ matrix.artifact }}.exe
+
+      - name: Upload artifact (Unix)
+        if: runner.os != 'Windows'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.artifact }}
+
+      - name: Upload artifact (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}.exe
 
   release:
     needs: build
@@ -81,3 +102,4 @@ jobs:
             artifacts/collected-linux-arm64/collected-linux-arm64
             artifacts/collected-macos-amd64/collected-macos-amd64
             artifacts/collected-macos-arm64/collected-macos-arm64
+            artifacts/collected-windows-amd64/collected-windows-amd64.exe

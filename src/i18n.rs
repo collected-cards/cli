@@ -138,7 +138,6 @@ static EN: LazyLock<HashMap<&str, &str>> = LazyLock::new(|| translations! {
     "stats.decks" => "Decks",
     "stats.tcgs" => "TCGs",
     "stats.entries" => "entries",
-    "stats.users" => "users",
     "stats.value_change_24h" => "(24h)",
     // deck bracket
     "deck_bracket.title" => "Bracket Analysis",
@@ -351,7 +350,6 @@ static DE: LazyLock<HashMap<&str, &str>> = LazyLock::new(|| translations! {
     "stats.decks" => "Decks",
     "stats.tcgs" => "TCGs",
     "stats.entries" => "Einträge",
-    "stats.users" => "Nutzer",
     "stats.value_change_24h" => "(24h)",
     "deck_bracket.title" => "Bracket-Analyse",
     "deck_bracket.not_found" => "Deck nicht gefunden",

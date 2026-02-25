@@ -176,7 +176,6 @@ pub struct CardInfo {
 #[serde(rename_all = "camelCase")]
 pub struct PlatformStats {
     pub total_cards: i64,
-    pub total_users: i64,
     pub total_value: f64,
     pub total_listings: i64,
 }

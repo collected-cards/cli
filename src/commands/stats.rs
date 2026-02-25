@@ -12,7 +12,7 @@ pub async fn platform_stats(api: &ApiClient) -> Result<()> {
         .query(
             "{ 
                 platformStats { 
-                    totalCards totalEntries totalValue collectionCount userCount
+                    totalCards totalEntries totalValue collectionCount
                 } 
                 myCollections { 
                     id name entryCount
@@ -34,7 +34,6 @@ pub async fn platform_stats(api: &ApiClient) -> Result<()> {
     let total_entries = platform["totalEntries"].as_i64().unwrap_or(0);
     let total_value = platform["totalValue"].as_f64().unwrap_or(0.0);
     let collection_count = platform["collectionCount"].as_i64().unwrap_or(0);
-    let user_count = platform["userCount"].as_i64().unwrap_or(0);
     
     println!("  {} {}", "📊", t("stats.platform").bold());
     println!("     {}+ {} · {} {} · €{:.0}",
@@ -44,11 +43,9 @@ pub async fn platform_stats(api: &ApiClient) -> Result<()> {
         t("stats.entries"),
         total_value,
     );
-    println!("     {} {} · {} {}",
+    println!("     {} {}",
         collection_count.to_string().cyan(),
         t("collection.collections"),
-        user_count.to_string().cyan(),
-        t("stats.users"),
     );
     
     // My stats

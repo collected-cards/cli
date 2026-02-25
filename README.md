@@ -27,11 +27,16 @@ Download the latest binary from [Releases](https://github.com/collected-cards/cl
 | Linux ARM64 | `collected-linux-arm64` |
 | macOS x86_64 (Intel) | `collected-macos-amd64` |
 | macOS ARM64 (Apple Silicon) | `collected-macos-arm64` |
+| Windows x86_64 | `collected-windows-amd64.exe` |
 
+**Linux / macOS:**
 ```bash
 chmod +x collected-linux-amd64
 sudo mv collected-linux-amd64 /usr/local/bin/collected
 ```
+
+**Windows:**
+Download `collected-windows-amd64.exe`, rename to `collected.exe`, and add to your PATH.
 
 ## 🔨 Build from Source
 
