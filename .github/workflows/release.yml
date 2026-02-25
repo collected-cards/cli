@@ -33,6 +33,10 @@ jobs:
             os: windows-latest
             artifact: collected-windows-amd64
             ext: ".exe"
+          - target: aarch64-pc-windows-msvc
+            os: windows-latest
+            artifact: collected-windows-arm64
+            ext: ".exe"
 
     runs-on: ${{ matrix.os }}
 
@@ -103,3 +107,4 @@ jobs:
             artifacts/collected-macos-amd64/collected-macos-amd64
             artifacts/collected-macos-arm64/collected-macos-arm64
             artifacts/collected-windows-amd64/collected-windows-amd64.exe
+            artifacts/collected-windows-arm64/collected-windows-arm64.exe

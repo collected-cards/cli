@@ -28,6 +28,7 @@ Download the latest binary from [Releases](https://github.com/collected-cards/cl
 | macOS x86_64 (Intel) | `collected-macos-amd64` |
 | macOS ARM64 (Apple Silicon) | `collected-macos-arm64` |
 | Windows x86_64 | `collected-windows-amd64.exe` |
+| Windows ARM64 | `collected-windows-arm64.exe` |
 
 **Linux / macOS:**
 ```bash
