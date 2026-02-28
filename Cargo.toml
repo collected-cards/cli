@@ -1,6 +1,6 @@
 [package]
 name = "collected"
-version = "0.3.0"
+version = "0.3.3"
 edition = "2021"
 description = "CLI for collected.cards — manage your TCG collection from the terminal"
 license = "MIT"
@@ -20,6 +20,7 @@ tokio = { version = "1", features = ["full"] }
 toml = "0.8"
 dirs = "6"
 colored = "2"
+enable-ansi-support = "0.2"
 comfy-table = "7"
 indicatif = "0.17"
 dialoguer = "0.11"

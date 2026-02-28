@@ -339,6 +339,12 @@ enum MarketAction {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Enable ANSI color support on Windows (CMD + PowerShell)
+    #[cfg(windows)]
+    {
+        let _ = enable_ansi_support::enable_ansi_support();
+    }
+
     i18n::init();
     let cli = Cli::parse();
     let config = config::Config::load()?;
